@@ -24,14 +24,14 @@ echo "Installing system dependencies..."
 
 case $DISTRO in
 fedora)
-  sudo dnf install -y python3-gobject gtk4 libadwaita pipx
+  sudo dnf install -y python3-gobject gtk4 libadwaita python3-pip
   ;;
 ubuntu | debian)
   sudo apt update
-  sudo apt install -y python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 pipx
+  sudo apt install -y python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 python3-pip
   ;;
 arch | manjaro)
-  sudo pacman -S --noconfirm python-gobject gtk4 libadwaita python-pipx
+  sudo pacman -S --noconfirm python-gobject gtk4 libadwaita python-pip
   ;;
 *)
   echo "Unsupported distribution: $DISTRO"
@@ -39,24 +39,26 @@ arch | manjaro)
   echo "  - python3-gobject"
   echo "  - gtk4"
   echo "  - libadwaita"
-  echo "  - pipx"
+  echo "  - python3-pip"
+  echo
+  echo "Then run: pip install --user -e ."
   exit 1
   ;;
 esac
 
 echo
 echo "Installing GClicker..."
-pipx install -e .
+pip install --user -e .
 
 echo
-echo "HINT: make sure /home/$USER/.local/bin is in path"
+echo "HINT: make sure ~/.local/bin is in your PATH"
 echo "=== Installation Complete ==="
 echo
 echo "Usage:"
-echo "  gclicker                   - Launch GUI"
-echo "  gclicker-cli -i 0.1        - Start CLI with 0.1s interval"
-echo "  gclicker-cli --toggle      - Toggle on/off (daemon mode)"
+echo "  gclicker                   - Launch GUI with hotkey support"
+echo "  gclicker-cli -i 0.1        - Start CLI with 0.1s interval (foreground)"
+echo "  gclicker-cli --toggle      - Toggle clicking on/off (background)"
 echo "  gclicker-cli --stop        - Stop all instances"
 echo
-echo "See README.md for more options and setting up global hotkeys."
+echo "See README.md for more details."
 echo
