@@ -3,10 +3,71 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Gtk, Adw, GLib, Gio
 import threading
+from html import escape
 
 from gclicker.wayland_clicker import WaylandPortalClicker
+from gclicker.dbus_service import GClickerDBusService
+from gclicker.settings import Settings
+
+try:
+    from pynput import keyboard
+    HOTKEY_AVAILABLE = True
+except ImportError:
+    HOTKEY_AVAILABLE = False
+    print("Warning: pynput not available, hotkey support disabled")
+
+
+class PreferencesDialog(Adw.PreferencesWindow):
+    """Preferences dialog for gclicker settings."""
+
+    def __init__(self, parent, settings, on_hotkey_changed):
+        """Initialize preferences dialog."""
+        super().__init__()
+        self.set_transient_for(parent)
+        self.set_modal(True)
+        self.settings = settings
+        self.on_hotkey_changed = on_hotkey_changed
+
+        # Create preferences page
+        page = Adw.PreferencesPage()
+        page.set_title("General")
+        page.set_icon_name("preferences-system-symbolic")
+
+        # Hotkey group
+        hotkey_group = Adw.PreferencesGroup()
+        hotkey_group.set_title("Global Hotkey")
+        hotkey_group.set_description("Configure the global hotkey to toggle clicking")
+
+        # Hotkey entry row
+        self.hotkey_row = Adw.EntryRow()
+        self.hotkey_row.set_title("Hotkey")
+        self.hotkey_row.set_text(settings.hotkey)
+        self.hotkey_row.connect("changed", self.on_hotkey_entry_changed)
+        hotkey_group.add(self.hotkey_row)
+
+        # Info label
+        info_label = Gtk.Label()
+        info_label.set_text("Format: <f8>, <ctrl>+<alt>+c, etc.\nChanges apply immediately.")
+        info_label.set_xalign(0)
+        info_label.add_css_class("dim-label")
+        info_label.add_css_class("caption")
+        info_label.set_margin_top(6)
+        info_label.set_margin_start(12)
+        info_label.set_margin_bottom(12)
+        hotkey_group.add(info_label)
+
+        page.add(hotkey_group)
+        self.add(page)
+
+    def on_hotkey_entry_changed(self, entry):
+        """Handle hotkey entry changes."""
+        new_hotkey = entry.get_text()
+        if new_hotkey:
+            self.settings.hotkey = new_hotkey
+            if self.on_hotkey_changed:
+                self.on_hotkey_changed(new_hotkey)
 
 
 class GClickerWindow(Gtk.ApplicationWindow):
@@ -15,12 +76,41 @@ class GClickerWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # Settings
+        self.settings = Settings()
+
         # Initial interval is set via on_interval_changed after spinboxes are created
         self.clicker = WaylandPortalClicker(interval=0.1)
+
+        # D-Bus service
+        self.dbus_service = GClickerDBusService(
+            self.clicker,
+            on_state_changed=self.on_clicker_state_changed
+        )
+        self.dbus_service.start()
+
+        # Hotkey listener
+        self.hotkey_listener = None
+        if HOTKEY_AVAILABLE:
+            self._setup_hotkey_listener()
 
         # Window setup
         self.set_default_size(450, 200)
         self.set_title("GClicker")
+
+        # Header bar with menu button
+        header = Gtk.HeaderBar()
+        menu_button = Gtk.MenuButton()
+        menu_button.set_icon_name("open-menu-symbolic")
+
+        # Create menu
+        menu = Gio.Menu()
+        menu.append("Preferences", "app.preferences")
+        menu.append("About", "app.about")
+        menu_button.set_menu_model(menu)
+        header.pack_end(menu_button)
+
+        self.set_titlebar(header)
 
         # Main container
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
@@ -104,7 +194,68 @@ class GClickerWindow(Gtk.ApplicationWindow):
 
         main_box.append(button_box)
 
+        # Hotkey status label
+        if HOTKEY_AVAILABLE:
+            hotkey_label = Gtk.Label()
+            escaped_hotkey = escape(self.settings.hotkey)
+            hotkey_label.set_markup(f'<span size="small">Toggle hotkey: <b>{escaped_hotkey}</b></span>')
+            hotkey_label.add_css_class("dim-label")
+            hotkey_label.set_margin_top(10)
+            main_box.append(hotkey_label)
+            self.hotkey_label = hotkey_label
+
         self.set_child(main_box)
+
+    def _setup_hotkey_listener(self):
+        """Set up the global hotkey listener."""
+        try:
+            if self.hotkey_listener:
+                self.hotkey_listener.stop()
+
+            def on_activate():
+                """Called when hotkey is pressed."""
+                GLib.idle_add(self._toggle_from_hotkey)
+
+            # Parse the hotkey string and create listener
+            self.hotkey_listener = keyboard.GlobalHotKeys({
+                self.settings.hotkey: on_activate
+            })
+            self.hotkey_listener.start()
+        except Exception as e:
+            print(f"Error setting up hotkey listener: {e}")
+
+    def _toggle_from_hotkey(self):
+        """Toggle clicking from hotkey."""
+        # Call the D-Bus toggle method
+        self.dbus_service._toggle()
+        return False
+
+    def on_hotkey_changed(self, new_hotkey):
+        """Handle hotkey configuration change."""
+        self._setup_hotkey_listener()
+        if hasattr(self, 'hotkey_label'):
+            escaped_hotkey = escape(new_hotkey)
+            self.hotkey_label.set_markup(f'<span size="small">Toggle hotkey: <b>{escaped_hotkey}</b></span>')
+
+    def on_clicker_state_changed(self, running, interval):
+        """Handle state change from D-Bus service."""
+        GLib.idle_add(self._update_ui_state, running, interval)
+
+    def _update_ui_state(self, running, interval):
+        """Update UI to reflect clicker state."""
+        if running:
+            self.start_button.set_sensitive(False)
+            self.stop_button.set_sensitive(True)
+            self.minutes_spin.set_sensitive(False)
+            self.seconds_spin.set_sensitive(False)
+            self.milliseconds_spin.set_sensitive(False)
+        else:
+            self.start_button.set_sensitive(True)
+            self.stop_button.set_sensitive(False)
+            self.minutes_spin.set_sensitive(True)
+            self.seconds_spin.set_sensitive(True)
+            self.milliseconds_spin.set_sensitive(True)
+        return False
 
     def on_interval_changed(self, spin_button):
         """Handle interval change."""
@@ -154,6 +305,13 @@ class GClickerWindow(Gtk.ApplicationWindow):
         self.seconds_spin.set_sensitive(True)
         self.milliseconds_spin.set_sensitive(True)
 
+    def cleanup(self):
+        """Clean up resources."""
+        if self.hotkey_listener:
+            self.hotkey_listener.stop()
+        self.dbus_service.stop()
+        self.clicker.cleanup()
+
 
 class GClickerApplication(Adw.Application):
     """Main application class."""
@@ -161,11 +319,58 @@ class GClickerApplication(Adw.Application):
     def __init__(self):
         super().__init__(application_id='com.github.gclicker')
         self.connect('activate', self.on_activate)
+        self.win = None
+
+        # Set up actions
+        self._setup_actions()
+
+    def _setup_actions(self):
+        """Set up application actions."""
+        # Preferences action
+        preferences_action = Gio.SimpleAction.new("preferences", None)
+        preferences_action.connect("activate", self.on_preferences)
+        self.add_action(preferences_action)
+
+        # About action
+        about_action = Gio.SimpleAction.new("about", None)
+        about_action.connect("activate", self.on_about)
+        self.add_action(about_action)
 
     def on_activate(self, app):
         """Handle application activation."""
-        self.win = GClickerWindow(application=app)
+        if not self.win:
+            self.win = GClickerWindow(application=app)
         self.win.present()
+
+    def on_preferences(self, action, param):
+        """Show preferences dialog."""
+        if self.win:
+            dialog = PreferencesDialog(
+                self.win,
+                self.win.settings,
+                self.win.on_hotkey_changed
+            )
+            dialog.present()
+
+    def on_about(self, action, param):
+        """Show about dialog."""
+        about = Adw.AboutWindow(
+            transient_for=self.win,
+            application_name="GClicker",
+            application_icon="input-mouse-symbolic",
+            developer_name="gclicker",
+            version="1.0.0",
+            comments="A simple auto-clicker for Linux with Wayland support",
+            website="https://github.com/yourusername/gclicker",
+            license_type=Gtk.License.MIT_X11,
+        )
+        about.present()
+
+    def do_shutdown(self):
+        """Handle application shutdown."""
+        if self.win:
+            self.win.cleanup()
+        Adw.Application.do_shutdown(self)
 
 
 def main():
