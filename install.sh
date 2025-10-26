@@ -24,14 +24,14 @@ echo "Installing system dependencies..."
 
 case $DISTRO in
 fedora)
-  sudo dnf install -y python3-gobject gtk4 libadwaita python3-pip
+  sudo dnf install -y python3-gobject gtk4 libadwaita pipx
   ;;
 ubuntu | debian)
   sudo apt update
-  sudo apt install -y python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 python3-pip
+  sudo apt install -y python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 pipx
   ;;
 arch | manjaro)
-  sudo pacman -S --noconfirm python-gobject gtk4 libadwaita python-pip
+  sudo pacman -S --noconfirm python-gobject gtk4 libadwaita python-pipx
   ;;
 *)
   echo "Unsupported distribution: $DISTRO"
@@ -39,13 +39,14 @@ arch | manjaro)
   echo "  - python3-gobject"
   echo "  - gtk4"
   echo "  - libadwaita"
+  echo "  - pipx"
   exit 1
   ;;
 esac
 
 echo
 echo "Installing GClicker..."
-pip install -e .
+pipx install -e .
 
 echo
 echo "HINT: make sure /home/$USER/.local/bin is in path"
