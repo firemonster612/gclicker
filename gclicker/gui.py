@@ -15,74 +15,72 @@ class GClickerWindow(Gtk.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # Initial interval is set via on_interval_changed after spinboxes are created
         self.clicker = WaylandPortalClicker(interval=0.1)
 
         # Window setup
-        self.set_default_size(400, 300)
+        self.set_default_size(450, 200)
         self.set_title("GClicker")
 
         # Main container
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        main_box.set_margin_top(20)
-        main_box.set_margin_bottom(20)
-        main_box.set_margin_start(20)
-        main_box.set_margin_end(20)
+        main_box.set_margin_top(40)
+        main_box.set_margin_bottom(40)
+        main_box.set_margin_start(40)
+        main_box.set_margin_end(40)
         main_box.set_valign(Gtk.Align.CENTER)
+        main_box.set_halign(Gtk.Align.CENTER)
 
-        # Title
-        title = Gtk.Label(label="GClicker")
-        title.add_css_class("title-1")
-        main_box.append(title)
+        # Time interval boxes
+        time_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        time_box.set_halign(Gtk.Align.CENTER)
 
-        # Status label
-        self.status_label = Gtk.Label(label="Idle")
-        self.status_label.add_css_class("title-4")
-        main_box.append(self.status_label)
+        # Minutes
+        min_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        min_label = Gtk.Label(label="Minutes")
+        min_label.add_css_class("caption")
+        min_box.append(min_label)
 
-        # Interval control group
-        interval_group = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        min_adj = Gtk.Adjustment(value=0, lower=0, upper=59, step_increment=1, page_increment=5)
+        self.minutes_spin = Gtk.SpinButton()
+        self.minutes_spin.set_adjustment(min_adj)
+        self.minutes_spin.set_digits(0)
+        self.minutes_spin.set_width_chars(5)
+        self.minutes_spin.connect("value-changed", self.on_interval_changed)
+        min_box.append(self.minutes_spin)
+        time_box.append(min_box)
 
-        interval_label = Gtk.Label(label="Click Interval (seconds)")
-        interval_label.add_css_class("heading")
-        interval_group.append(interval_label)
+        # Seconds
+        sec_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        sec_label = Gtk.Label(label="Seconds")
+        sec_label.add_css_class("caption")
+        sec_box.append(sec_label)
 
-        # Interval adjustment (0.001 to 10 seconds)
-        interval_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        interval_box.set_halign(Gtk.Align.CENTER)
+        sec_adj = Gtk.Adjustment(value=0, lower=0, upper=59, step_increment=1, page_increment=5)
+        self.seconds_spin = Gtk.SpinButton()
+        self.seconds_spin.set_adjustment(sec_adj)
+        self.seconds_spin.set_digits(0)
+        self.seconds_spin.set_width_chars(5)
+        self.seconds_spin.connect("value-changed", self.on_interval_changed)
+        sec_box.append(self.seconds_spin)
+        time_box.append(sec_box)
 
-        adjustment = Gtk.Adjustment(
-            value=0.1,
-            lower=0.001,
-            upper=10.0,
-            step_increment=0.01,
-            page_increment=0.1
-        )
-        self.interval_spin = Gtk.SpinButton()
-        self.interval_spin.set_adjustment(adjustment)
-        self.interval_spin.set_digits(3)
-        self.interval_spin.set_value(0.1)
-        self.interval_spin.connect("value-changed", self.on_interval_changed)
+        # Milliseconds
+        ms_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        ms_label = Gtk.Label(label="Milliseconds")
+        ms_label.add_css_class("caption")
+        ms_box.append(ms_label)
 
-        interval_box.append(self.interval_spin)
-        interval_group.append(interval_box)
+        ms_adj = Gtk.Adjustment(value=100, lower=0, upper=999, step_increment=10, page_increment=100)
+        self.milliseconds_spin = Gtk.SpinButton()
+        self.milliseconds_spin.set_adjustment(ms_adj)
+        self.milliseconds_spin.set_digits(0)
+        self.milliseconds_spin.set_width_chars(5)
+        self.milliseconds_spin.connect("value-changed", self.on_interval_changed)
+        ms_box.append(self.milliseconds_spin)
+        time_box.append(ms_box)
 
-        # Add some preset buttons
-        preset_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        preset_box.set_halign(Gtk.Align.CENTER)
-
-        presets = [
-            ("Fast (0.05s)", 0.05),
-            ("Normal (0.1s)", 0.1),
-            ("Slow (0.5s)", 0.5),
-        ]
-
-        for label, value in presets:
-            btn = Gtk.Button(label=label)
-            btn.connect("clicked", lambda b, v=value: self.interval_spin.set_value(v))
-            preset_box.append(btn)
-
-        interval_group.append(preset_box)
-        main_box.append(interval_group)
+        main_box.append(time_box)
 
         # Control buttons
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -91,38 +89,42 @@ class GClickerWindow(Gtk.ApplicationWindow):
 
         self.start_button = Gtk.Button(label="Start")
         self.start_button.add_css_class("suggested-action")
+        self.start_button.add_css_class("pill")
+        self.start_button.set_size_request(120, 50)
         self.start_button.connect("clicked", self.on_start_clicked)
         button_box.append(self.start_button)
 
         self.stop_button = Gtk.Button(label="Stop")
         self.stop_button.add_css_class("destructive-action")
+        self.stop_button.add_css_class("pill")
+        self.stop_button.set_size_request(120, 50)
         self.stop_button.set_sensitive(False)
         self.stop_button.connect("clicked", self.on_stop_clicked)
         button_box.append(self.stop_button)
 
         main_box.append(button_box)
 
-        # Info label
-        info_label = Gtk.Label(
-            label="Uses Wayland RemoteDesktop portal.\nPermission dialog appears on first run only."
-        )
-        info_label.add_css_class("dim-label")
-        info_label.set_wrap(True)
-        info_label.set_justify(Gtk.Justification.CENTER)
-        main_box.append(info_label)
-
         self.set_child(main_box)
 
     def on_interval_changed(self, spin_button):
         """Handle interval change."""
-        interval = spin_button.get_value()
-        self.clicker.set_interval(interval)
+        minutes = self.minutes_spin.get_value()
+        seconds = self.seconds_spin.get_value()
+        milliseconds = self.milliseconds_spin.get_value()
+
+        # Calculate total interval in seconds
+        total_interval = (minutes * 60) + seconds + (milliseconds / 1000.0)
+
+        # Ensure minimum interval
+        if total_interval < 0.001:
+            total_interval = 0.001
+
+        self.clicker.set_interval(total_interval)
 
     def on_start_clicked(self, button):
         """Handle start button click."""
         # Disable button while setting up
         self.start_button.set_sensitive(False)
-        self.status_label.set_label("Starting...")
 
         # Start in a thread to avoid blocking UI
         def start_thread():
@@ -132,12 +134,11 @@ class GClickerWindow(Gtk.ApplicationWindow):
             def update_ui():
                 if success:
                     self.stop_button.set_sensitive(True)
-                    self.interval_spin.set_sensitive(False)
-                    self.status_label.set_label("Clicking...")
-                    self.status_label.add_css_class("success")
+                    self.minutes_spin.set_sensitive(False)
+                    self.seconds_spin.set_sensitive(False)
+                    self.milliseconds_spin.set_sensitive(False)
                 else:
                     self.start_button.set_sensitive(True)
-                    self.status_label.set_label("Failed to start (permission denied?)")
                 return False
 
             GLib.idle_add(update_ui)
@@ -149,9 +150,9 @@ class GClickerWindow(Gtk.ApplicationWindow):
         self.clicker.stop()
         self.start_button.set_sensitive(True)
         self.stop_button.set_sensitive(False)
-        self.interval_spin.set_sensitive(True)
-        self.status_label.set_label("Idle")
-        self.status_label.remove_css_class("success")
+        self.minutes_spin.set_sensitive(True)
+        self.seconds_spin.set_sensitive(True)
+        self.milliseconds_spin.set_sensitive(True)
 
 
 class GClickerApplication(Adw.Application):
