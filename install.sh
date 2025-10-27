@@ -41,21 +41,21 @@ arch | manjaro)
   echo "  - libadwaita"
   echo "  - python3-pip"
   echo
-  echo "Then run: pip install --user -e ."
+  echo "Then run: pip install --user --break-system-packages -e ."
   exit 1
   ;;
 esac
 
 echo
 echo "Installing GClicker..."
-pip install --user -e .
+pip install --user --break-system-packages -e .
 
 echo
 echo "HINT: make sure ~/.local/bin is in your PATH"
 echo "=== Installation Complete ==="
 echo
 echo "Usage:"
-echo "  gclicker                   - Launch GUI with hotkey support"
+echo "  gclicker                   - Launch GUI"
 echo "  gclicker-cli -i 0.1        - Start CLI with 0.1s interval (foreground)"
 echo "  gclicker-cli --toggle      - Toggle clicking on/off (background)"
 echo "  gclicker-cli --stop        - Stop all instances"
