@@ -8,8 +8,6 @@ from pathlib import Path
 class Settings:
     """Manage gclicker settings."""
 
-    DEFAULT_HOTKEY = '<f8>'
-
     def __init__(self):
         """Initialize settings."""
         self.config_dir = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'gclicker'
@@ -29,9 +27,7 @@ class Settings:
 
     def _defaults(self):
         """Get default settings."""
-        return {
-            'hotkey': self.DEFAULT_HOTKEY,
-        }
+        return {}
 
     def save(self):
         """Save settings to file."""
@@ -41,14 +37,3 @@ class Settings:
                 json.dump(self._settings, f, indent=2)
         except Exception as e:
             print(f"Error saving settings: {e}")
-
-    @property
-    def hotkey(self):
-        """Get the configured hotkey."""
-        return self._settings.get('hotkey', self.DEFAULT_HOTKEY)
-
-    @hotkey.setter
-    def hotkey(self, value):
-        """Set the hotkey."""
-        self._settings['hotkey'] = value
-        self.save()

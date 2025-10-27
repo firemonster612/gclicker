@@ -5,69 +5,10 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, Gio
 import threading
-from html import escape
 
 from gclicker.wayland_clicker import WaylandPortalClicker
 from gclicker.dbus_service import GClickerDBusService
 from gclicker.settings import Settings
-
-try:
-    from pynput import keyboard
-    HOTKEY_AVAILABLE = True
-except ImportError:
-    HOTKEY_AVAILABLE = False
-    print("Warning: pynput not available, hotkey support disabled")
-
-
-class PreferencesDialog(Adw.PreferencesWindow):
-    """Preferences dialog for gclicker settings."""
-
-    def __init__(self, parent, settings, on_hotkey_changed):
-        """Initialize preferences dialog."""
-        super().__init__()
-        self.set_transient_for(parent)
-        self.set_modal(True)
-        self.settings = settings
-        self.on_hotkey_changed = on_hotkey_changed
-
-        # Create preferences page
-        page = Adw.PreferencesPage()
-        page.set_title("General")
-        page.set_icon_name("preferences-system-symbolic")
-
-        # Hotkey group
-        hotkey_group = Adw.PreferencesGroup()
-        hotkey_group.set_title("Global Hotkey")
-        hotkey_group.set_description("Configure the global hotkey to toggle clicking")
-
-        # Hotkey entry row
-        self.hotkey_row = Adw.EntryRow()
-        self.hotkey_row.set_title("Hotkey")
-        self.hotkey_row.set_text(settings.hotkey)
-        self.hotkey_row.connect("changed", self.on_hotkey_entry_changed)
-        hotkey_group.add(self.hotkey_row)
-
-        # Info label
-        info_label = Gtk.Label()
-        info_label.set_text("Format: <f8>, <ctrl>+<alt>+c, etc.\nChanges apply immediately.")
-        info_label.set_xalign(0)
-        info_label.add_css_class("dim-label")
-        info_label.add_css_class("caption")
-        info_label.set_margin_top(6)
-        info_label.set_margin_start(12)
-        info_label.set_margin_bottom(12)
-        hotkey_group.add(info_label)
-
-        page.add(hotkey_group)
-        self.add(page)
-
-    def on_hotkey_entry_changed(self, entry):
-        """Handle hotkey entry changes."""
-        new_hotkey = entry.get_text()
-        if new_hotkey:
-            self.settings.hotkey = new_hotkey
-            if self.on_hotkey_changed:
-                self.on_hotkey_changed(new_hotkey)
 
 
 class GClickerWindow(Gtk.ApplicationWindow):
@@ -89,11 +30,6 @@ class GClickerWindow(Gtk.ApplicationWindow):
         )
         self.dbus_service.start()
 
-        # Hotkey listener
-        self.hotkey_listener = None
-        if HOTKEY_AVAILABLE:
-            self._setup_hotkey_listener()
-
         # Window setup
         self.set_default_size(450, 200)
         self.set_title("GClicker")
@@ -105,7 +41,6 @@ class GClickerWindow(Gtk.ApplicationWindow):
 
         # Create menu
         menu = Gio.Menu()
-        menu.append("Preferences", "app.preferences")
         menu.append("About", "app.about")
         menu_button.set_menu_model(menu)
         header.pack_end(menu_button)
@@ -194,48 +129,7 @@ class GClickerWindow(Gtk.ApplicationWindow):
 
         main_box.append(button_box)
 
-        # Hotkey status label
-        if HOTKEY_AVAILABLE:
-            hotkey_label = Gtk.Label()
-            escaped_hotkey = escape(self.settings.hotkey)
-            hotkey_label.set_markup(f'<span size="small">Toggle hotkey: <b>{escaped_hotkey}</b></span>')
-            hotkey_label.add_css_class("dim-label")
-            hotkey_label.set_margin_top(10)
-            main_box.append(hotkey_label)
-            self.hotkey_label = hotkey_label
-
         self.set_child(main_box)
-
-    def _setup_hotkey_listener(self):
-        """Set up the global hotkey listener."""
-        try:
-            if self.hotkey_listener:
-                self.hotkey_listener.stop()
-
-            def on_activate():
-                """Called when hotkey is pressed."""
-                GLib.idle_add(self._toggle_from_hotkey)
-
-            # Parse the hotkey string and create listener
-            self.hotkey_listener = keyboard.GlobalHotKeys({
-                self.settings.hotkey: on_activate
-            })
-            self.hotkey_listener.start()
-        except Exception as e:
-            print(f"Error setting up hotkey listener: {e}")
-
-    def _toggle_from_hotkey(self):
-        """Toggle clicking from hotkey."""
-        # Call the D-Bus toggle method
-        self.dbus_service._toggle()
-        return False
-
-    def on_hotkey_changed(self, new_hotkey):
-        """Handle hotkey configuration change."""
-        self._setup_hotkey_listener()
-        if hasattr(self, 'hotkey_label'):
-            escaped_hotkey = escape(new_hotkey)
-            self.hotkey_label.set_markup(f'<span size="small">Toggle hotkey: <b>{escaped_hotkey}</b></span>')
 
     def on_clicker_state_changed(self, running, interval):
         """Handle state change from D-Bus service."""
@@ -307,8 +201,6 @@ class GClickerWindow(Gtk.ApplicationWindow):
 
     def cleanup(self):
         """Clean up resources."""
-        if self.hotkey_listener:
-            self.hotkey_listener.stop()
         self.dbus_service.stop()
         self.clicker.cleanup()
 
@@ -326,11 +218,6 @@ class GClickerApplication(Adw.Application):
 
     def _setup_actions(self):
         """Set up application actions."""
-        # Preferences action
-        preferences_action = Gio.SimpleAction.new("preferences", None)
-        preferences_action.connect("activate", self.on_preferences)
-        self.add_action(preferences_action)
-
         # About action
         about_action = Gio.SimpleAction.new("about", None)
         about_action.connect("activate", self.on_about)
@@ -341,16 +228,6 @@ class GClickerApplication(Adw.Application):
         if not self.win:
             self.win = GClickerWindow(application=app)
         self.win.present()
-
-    def on_preferences(self, action, param):
-        """Show preferences dialog."""
-        if self.win:
-            dialog = PreferencesDialog(
-                self.win,
-                self.win.settings,
-                self.win.on_hotkey_changed
-            )
-            dialog.present()
 
     def on_about(self, action, param):
         """Show about dialog."""
