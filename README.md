@@ -1,42 +1,57 @@
-# Gclicker (goated clicker)
+# GClicker
 
-Gclicker is a wayland native linux auto clicker written with python3 and GTK4/libadwaita
+A Wayland-native Linux auto-clicker with GTK4/libadwaita GUI and CLI interface.
 
 ## Installation
 
-Clone the repo:
 ```bash
 git clone https://github.com/firemonster612/gclicker.git
 cd gclicker
-```
-
-Run the install.sh
-```bash
 ./install.sh
 ```
 
-Uninstall:
-`pip uninstall gclicker`
+### Uninstall
+
+```bash
+pip uninstall gclicker
+```
 
 ## Usage
 
-options:
-  -h, --help            show this help message and exit
-  --version             show program's version number and exit
-  -i, --interval INTERVAL   Click interval in seconds (default: 0.1)
-  --toggle              Toggle: stop if running, start if not
-  --stop                Stop all running instances
-  --status              Show current status
+### GUI
 
-By running `gclicker` in a terminal you can start the UI.
-You can also use gclicker-cli to run a headless gclicker instance
-
-The UI and CLI have shared state allowing the CLI to control the UI, for example running:
+Launch the graphical interface:
+```bash
+gclicker
 ```
-gclicker-cli --toggle
-```
-While the GUI is running will use the current click interval set in the GUI and will update It's state (e.g. Graying out the start button). Running it with no UI will run gclicker in the background in the terminal.
 
-A quick tip is to set `gclicker --toggle` as a global shortcut in settings so you always have a toggle for gclicker ready.
+Set click interval using the spinboxes (minutes, seconds, milliseconds) and use Start/Stop buttons to control clicking.
+
+### CLI
+
+Control GClicker from the command line:
+
+```bash
+gclicker-cli --toggle          # Toggle clicking on/off
+gclicker-cli --stop            # Stop clicking
+gclicker-cli --status          # Show current status
+gclicker-cli -i 0.5 --toggle   # Set interval and toggle
+```
+
+The CLI and GUI share state via D-Bus, so CLI commands control the GUI if it's running.
+
+## Configuration
+
+### Global Keyboard Shortcut
+
+Configure a keyboard shortcut in GNOME Settings:
+
+1. Open **Settings** → **Keyboard** → **Keyboard Shortcuts**
+2. Scroll to **Custom Shortcuts** and click **+**
+3. Name: `Toggle GClicker`
+4. Command: `gclicker-cli --toggle`
+5. Set your preferred shortcut (e.g., `F8`)
+
+This allows you to toggle clicking from anywhere without opening the GUI.
 
 
